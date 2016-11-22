@@ -1,6 +1,7 @@
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import java.io.File;
+import java.io.FileOutputStream;
 
 /**
  * Created by nicholas on 11/11/16.
@@ -10,6 +11,9 @@ public class CCAmailTestClient {
     static File inFile;
 
     public static void main(String[] args) {
+        final int LOOP_COUNT = 16;
+        final String STATS_FILE = "/statistics.csv";
+
         if (args.length < 1) {
             printUsage();
         }
@@ -30,22 +34,32 @@ public class CCAmailTestClient {
             // Generate an encryption key.  In a real-world scenario, this will already exist.
             KeyGenerator keyGen = KeyGenerator.getInstance("AES");
             SecretKey keymat = keyGen.generateKey();
+            FileOutputStream stats = new FileOutputStream(path + STATS_FILE, true);
 
-            CCAmail testCipher = new CCAmail(keymat);
-            testCipher.encryptFile(inFile, new File(path + "/ciphertext.txt"), emailAddress);
+            for (int i = 0; i < LOOP_COUNT; i++) {
+                CCAmail testCipher = new CCAmail(keymat);
 
-            // Scramble stuff to test
-            testCipher.generateNewIV();
+                // Let's encrypt!
+                long start_time = System.nanoTime();
+                testCipher.encryptFile(inFile, new File(path + "/ciphertext.txt"), emailAddress);
+                long stop_time = System.nanoTime();
 
-            // Now let's go the other way
-            testCipher.decryptFile(new File(path + "/ciphertext.txt"), new File(path + "/recovered_pt.txt"), emailAddress);
+                String outstring = "encrypt," + ((stop_time - start_time)/1000000) + '\n';
+                stats.write(outstring.getBytes());
 
+                // Now let's go the other way
+                start_time = System.nanoTime();
+                testCipher.decryptFile(new File(path + "/ciphertext.txt"), new File(path + "/recovered_pt.txt"), emailAddress);
+                stop_time = System.nanoTime();
+                outstring = "decrypt," + ((stop_time - start_time)/1000000) + '\n';
+                stats.write(outstring.getBytes());
+            }
+
+            stats.close();
         } catch (Exception e) {
             System.err.println(e.getMessage());
             System.exit(-1);
         }
-
-
     }
 
     public static void printUsage() {

@@ -6,6 +6,7 @@ import javax.crypto.*;
 import javax.crypto.spec.GCMParameterSpec;
 import java.io.*;
 import java.security.*;
+import java.util.Arrays;
 
 public class CCAmail {
 	// The maximum GCM tag legnth is 16 bytes.  This is also the preferred length per SP 800-38D
@@ -26,7 +27,8 @@ public class CCAmail {
 		this.cryptoKey = cK;
 
 		// Generate a new Cipher object that will use the AES block cipher in GCM mode
-		this.cipher = Cipher.getInstance("AES/GCM/PKCS5Padding");
+		// I've had some issues with less-than-full blocks, so I'll manage the padding myself using '0' padding.
+		this.cipher = Cipher.getInstance("AES/GCM/NoPadding");
 
 		// Create space for an IV and generate a new IV
 		// NB: The IV is the critical security value for GCM
@@ -112,14 +114,14 @@ public class CCAmail {
 			}
 
 			byte[] plainText = cipher.doFinal(cipherText);
-
-			System.out.println("Success!");
 			fis.close();
 
 			FileOutputStream fos = new FileOutputStream(outFile);
-			for (int i = 0; i < plainText.length; i++)
+			for (int i = 0; i < plainText.length - cipher.getBlockSize(); i++)
 				fos.write(plainText[i]);
 
+			buffer = Arrays.copyOfRange(plainText, plainText.length - cipher.getBlockSize(), plainText.length);
+			fos.write(unpadBlock(buffer));
 			fos.close();
 
 		} catch (Exception e) {
@@ -136,5 +138,22 @@ public class CCAmail {
 	void updatePlainText(byte[] PT, byte[] buffer, int block, int blockSize) {
 		for (int i = 0; i < buffer.length; i++)
 			PT[block * blockSize + i] = buffer[i];
+	}
+
+	byte[] unpadBlock(byte[] block) {
+		int i = block.length;
+		while (i > 0 && block[i - 1] == 0)
+			i--;
+
+		byte[] returnBlock;
+		if (i == block.length)
+			return block;
+		else {
+			returnBlock = new byte[i];
+			for (int j = 0; j < i; j++)
+				returnBlock[j] = block[j];
+		}
+
+		return returnBlock;
 	}
 }
